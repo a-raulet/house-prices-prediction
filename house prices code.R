@@ -24,9 +24,8 @@ if(!require(glmnet)) install.packages("glmnet", repos = "http://cran.us.r-projec
 ### Data Exploration ####
 
 # Downloading the train and validation sets from GitHub to Rstudio environment
-
-train <- read.csv("https://github.com/a-raulet/house-prices-prediction/blob/main/train.csv", 
-                  stringsAsFactors = FALSE)
+library(readr)
+train <- read.csv("https://github.com/a-raulet/house-prices-prediction/blob/main/train.csv")
 
 validation <- read.csv("https://github.com/a-raulet/house-prices-prediction/blob/main/test.csv", 
                        stringsAsFactors = FALSE)
@@ -154,12 +153,9 @@ train <- train %>% mutate_if(is.character, as.factor)
 # Converting "Year" variables to date variables :
 train <- train %>% mutate(YearBuilt = parse_date_time(YearBuilt, orders = "Y"),
                           YearRemodAdd = parse_date_time(YearRemodAdd, orders = "Y"),
-                          GarageYrBlt = parse_date_time(GarageYrBlt, orders = "Y"),
-                          DateSold = make_date(year = YrSold, month = MoSold))
+                          GarageYrBlt = parse_date_time(GarageYrBlt, orders = "Y"))
 
-# Adding duration variables :
-train <- train %>% mutate(durationBltSold = difftime(DateSold, YearBuilt, units = "weeks"),
-                          durationRemodSold = difftime(DateSold, YearRemodAdd, units = "weeks"))
+
 
 ### Cleaning validation set ####
 
@@ -367,10 +363,13 @@ validation <- validation %>% mutate_if(is.character, as.factor)
 # Converting "Year" variables to date variables :
 validation <- validation %>% mutate(YearBuilt = parse_date_time(YearBuilt, orders = "Y"),
                                     YearRemodAdd = parse_date_time(YearRemodAdd, orders = "Y"),
-                                    GarageYrBlt = parse_date_time(GarageYrBlt, orders = "Y"),
-                                    DateSold = make_date(year = YrSold, month = MoSold))
+                                    GarageYrBlt = parse_date_time(GarageYrBlt, orders = "Y"))
 
-# We must be sure we have the same number levels of in both sets.
+
+
+
+### Checking factor levels in train and validation sets
+# We must be sure we have the same number of levels of in both sets.
 # Checking the levels of factors in train and validation sets :
 a <- train %>% summarise_if(is.factor, nlevels)
 
@@ -379,7 +378,7 @@ b <- validation %>% summarise_if(is.factor, nlevels)
 a == b
 
 # To be sure we have the same number of levels in both sets, we bind the sets by row and reordering the levels.
-temp_df <- rbind(train[,-c(81:84)], validation[,-81])
+temp_df <- rbind(train[, -81], validation)
 
 temp_df <- temp_df %>% mutate_if(is.factor, as.factor)
 
@@ -399,12 +398,16 @@ d <- validation %>% summarise_if(is.factor, nlevels)
 
 c == d
 
+# Everything is clean. We rename 'train_reordered' with a shorter name and reuse the name 'train' :
+train <- train_reordered
+
 # Our dataset is clean. We have no more NAs, and the same number of levels in train and validation sets.
 # We can start our analysis.
 
 
 
 ### Analysis of the sale price variable ####
+
 
 # Distribution of Sale Prices
 ggplot(train, aes(SalePrice)) +
@@ -415,7 +418,7 @@ ggplot(train, aes(SalePrice)) +
 summary(train$SalePrice)
 
 # Boxplot of Sale Prices by location
-ggplot(train, aes(Neighborhood, SalePrice)) +
+ggplot(train, aes(reorder(Neighborhood, SalePrice), SalePrice)) +
   geom_boxplot() +
   geom_hline(aes(yintercept = mean(SalePrice), color = "red")) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
@@ -437,15 +440,45 @@ train %>% mutate(Remodel_diff = YearRemodAdd - YearBuilt,
   theme(axis.text.x = element_blank()) +
   ggtitle("Sale price according to year of construction")
 
+
+### Bivariate normal distribution between 'SalePrice' and predictors ####
+
+# Selecting only numerical variables
+num_data <- select_if(train, is.numeric)
+length(num_data)
+
+# Creating a grid plot with all categorical variables against the 'SalePrice' :
+grid_num <- lapply(2:ncol(num_data[, -54]),
+                   function(col) ggplot2::qplot(x = num_data[[col]],
+                                                y = train$SalePrice,
+                                                geom = "point",
+                                                xlab = names(num_data)[[col]],
+                                                ylab = ""))
+
+cowplot::plot_grid(plotlist = grid_num)
+
+# Numerical variables with bivariate normal distribution (selection for better visualization)
+selected_num <- num_data %>% dplyr::select(OverallQual, OverallCond, ExterQual, BsmtFinSF1, TotalBsmtSF, X1stFlrSF, X2ndFlrSF,
+                                           GrLivArea, KitchenQual, TotRmsAbvGrd, GarageFinish, GarageCars, GarageArea, 
+                                           FullBath, HeatingQC) 
+
+grid_num_selected <-lapply(1:ncol(selected_num),
+                           function(col) ggplot2::qplot(x = selected_num[[col]],
+                                                        y = train$SalePrice,
+                                                        geom = "point",
+                                                        xlab = names(selected_num)[[col]]))
+
+cowplot::plot_grid(plotlist = grid_num_selected) 
+
 # Selecting only categorical variables
 categ_data <- select_if(train, is.factor)
 length(categ_data)
 
 # Creating a grid plot with all categorical variables against the 'SalePrice' :
-list_factors <-lapply(1:ncol(categ_data_sp[,-25]),
-                      function(col) ggplot2::qplot(categ_data_sp[[col]], train$SalePrice,
+list_factors <-lapply(1:ncol(categ_data),
+                      function(col) ggplot2::qplot(reorder(categ_data[[col]], train$SalePrice), train$SalePrice,
                                                    geom = "boxplot",
-                                                   xlab = names(categ_data_sp)[[col]]))
+                                                   xlab = names(categ_data)[[col]]))
 
 cowplot::plot_grid(plotlist = list_factors)
 
@@ -488,22 +521,28 @@ fviz_contrib(pca_num, choice = "var", axes = 1, top = 20)
 # PC2
 fviz_contrib(pca_num, choice = "var", axes = 2, top = 20)
 
-# Screeplot to visualize the "elbow" to determine the number of components
+# Screeplot to visualize the "elbow" to determine the number of components (2 components)
 fviz_screeplot(pca_num)
 
-# Applying Kaiser-Guttman rule to determine the number of components (eigenvalue > 1) :
+# Applying Kaiser-Guttman rule to determine the number of components (eigenvalue > 1) : (17 components)
 get_eigenvalue(pca_num) %>% filter(eigenvalue > 1)
 
-# Parallel analysis to determine the number of components to retain
+# Parallel analysis to determine the number of components to retain 
 # Parallel analysis :
 paran_output <- paran(train_num[,-c(1, 54)], seed = 69, graph = TRUE)
 
-# Number of components to retain :
+# Number of components to retain : (11 components)
 paran_output$Retained
 
 
+# Extracting principal components :
+train_pc <- pca_num$x[, 1:17] %>% as.data.frame()
 
-## Training the models
+# Adding the outcome :
+train_pc <- train_pc %>% cbind(train$SalePrice) %>% rename(SalePrice = `train$SalePrice` )
+
+
+### Training the models ####
 
 ### Data partition and cross-validation plan
 
@@ -511,7 +550,393 @@ paran_output$Retained
 
 set.seed(69, sample.kind = "Rounding")
 
-test_index <- createDataPartition(train_reordered$SalePrice, times = 1, p = 0.8, list = FALSE)
+test_index <- createDataPartition(train$SalePrice, times = 1, p = 0.8, list = FALSE)
 
-train_set <- train_reordered[test_index,]
-test_set <- train_reordered[-test_index,]
+train_set <- train[test_index,]
+test_set <-  train[-test_index,]
+
+
+# Train and test sets with 11 components :
+train_11 <- train_pc[, 1:11] %>% cbind(train$SalePrice) %>% rename(SalePrice = `train$SalePrice` )
+test_11 <- train_pc[, 1:11] %>% cbind(train$SalePrice) %>% rename(SalePrice = `train$SalePrice` )
+
+train_11 <- train_11[test_index, ]
+test_11 <- test_11[-test_index, ]
+
+# Train and test sets with 17 components :
+train_17 <- train_pc[test_index,]
+test_17 <- train_pc[-test_index,]
+
+# Creating a cross-validation plan
+cv_plan <- trainControl(method = "cv", number = 10)
+
+
+### Transformation of the outcome 'SalePrice' with log function
+
+# Distribution of 'SalePrice' with mean and median
+train %>% ggplot(aes(SalePrice)) +
+  geom_density() +
+  geom_vline(aes(xintercept = mean(SalePrice), color = "mean")) +
+  geom_vline(aes(xintercept = median(SalePrice), color = "median")) +
+  scale_color_manual(name = "Legend", values = c(mean = "black", median = "red"))
+
+
+# Log transformation of 'SalePrice' for better predictions
+train %>% ggplot(aes(log(SalePrice))) +
+  geom_density() +
+  geom_vline(aes(xintercept = mean(log(SalePrice)), color = "mean")) +
+  geom_vline(aes(xintercept = median(log(SalePrice)), color = "median")) +
+  scale_color_manual(name = "Legend", values = c(mean = "black", median = "red")) +
+  ggtitle("Normal distribution with log transformation of the outcome")
+
+
+# We compare predictions of linear models with and without log transformation of the outcome
+# Linear model with 'SalePrice' as outcome to predict :
+model_lm <- lm(SalePrice ~ GrLivArea * OverallQual,
+               train)
+
+pred_lm <- predict(model_lm, test_set)
+RMSE(log(pred_lm), log(test_set$SalePrice))
+
+# Linear model with 'log(SalePrice)' as outcome to predict :
+model_lm_log <- lm(log(SalePrice) ~ GrLivArea * OverallQual,
+                   train)
+
+pred_lm_log <- predict(model_lm_log, test_set)
+RMSE(pred_lm_log, log(test_set$SalePrice))
+
+# The RMSE is better when we transform the outcome in our model with the `log` function 
+# rather than transforming our predictions afterwards.
+
+
+
+### First model : Linear regression ####
+
+# Training a linear model
+model_lm <- train(log(SalePrice) ~ ., 
+                  method = "lm", 
+                  trControl = cv_plan, 
+                  preProcess = c("nzv", "center", "scale", "pca"),
+                  data = train_set)
+
+# Predicting results
+pred_lm <- predict(model_lm, test_set)
+
+(rmse_lm <- RMSE(log(test_set$SalePrice), pred_lm))
+
+# Plot of predictions with linear model
+test_set %>% cbind(pred_lm) %>% 
+  ggplot(aes(pred_lm, log(SalePrice))) +
+  geom_point() +
+  geom_abline(color = "blue") +
+  ggtitle("Linear regression model predictions vs actual values")
+
+
+### Second model : GLMnet ####
+
+# Training a GLMnet model
+set.seed(69, sample.kind = "Rounding")
+
+model_glmnet <- train(log(SalePrice) ~ ., 
+                      train_set,
+                      tuneGrid = expand.grid(alpha = 0:1,
+                                             lambda = seq(0.0001, 1, length = 20)),
+                      method = "glmnet",
+                      trControl = cv_plan,
+                      preProcess = c("nzv", "center", "scale"))
+
+# Plot of ridge and lasso parameters
+plot(model_glmnet)
+
+# Predictions of GLMnet model :
+pred_glmnet <- predict(model_glmnet, test_set)
+
+(rmse_glmnet <- RMSE(log(test_set$SalePrice), pred_glmnet))
+
+
+# Plot of predictions of linear model
+test_set %>% cbind(pred_glmnet) %>% 
+  ggplot(aes(pred_glmnet, log(SalePrice))) +
+  geom_point() +
+  geom_abline(color = "blue") +
+  ggtitle("GLMnet model predictions vs actual values")
+
+### Third model : randomForest ####
+
+# Training a randomForest model
+model_rf <- train(log(SalePrice) ~ ., 
+                  tuneLength = 10, 
+                  data = train_set, 
+                  method = "ranger",
+                  trControl = cv_plan)
+
+# Plot of the tuning of 10 randomForest models
+plot(model_rf)
+
+# Best tune for the randomForest model :
+model_rf$bestTune
+
+# Predictions of the randomForest model :
+pred_rf <- predict(model_rf, test_set)
+
+(rmse_rf <- RMSE(log(test_set$SalePrice), pred_rf))
+
+
+# Plot of the randomForest predictions
+test_set %>% cbind(pred_rf) %>% 
+  ggplot(aes(pred_rf, log(SalePrice))) +
+  geom_point() +
+  geom_abline(color = "blue") +
+  ggtitle("randomForest model predictions vs actual values")
+
+
+### Fourth model : Generalized Additive Model (GAM) ####
+
+# Transformation of predictor : an example with 'GrLivArea' against 'SalePrice'
+# Transforming predictor : squared and cubic
+fmla_sqr <- SalePrice ~ I(GrLivArea^2)
+
+fmla_cub <- SalePrice ~ I(GrLivArea^3)
+
+# Fitting a model of price as a function of squared area and cubic area
+model_sqr <- lm(fmla_sqr, train)
+
+model_cub <- lm(fmla_cub, train)
+
+# Fitting a model of price as a linear function of 'GrLivArea'
+model_lin <- lm(SalePrice ~ GrLivArea, train)
+
+
+# Making predictions and comparing
+train %>% mutate(linear = predict(model_lin), # predictions from linear model
+                 squared = predict(model_sqr),        # predictions from quadratic model
+                 cubic = predict(model_cub)) %>%      # predictions from cubic model
+  gather(key = modeltype, value = pred, linear, squared, cubic) %>% # gather the predictions
+  ggplot(aes(x = GrLivArea)) + 
+  geom_point(aes(y = SalePrice, label = Id)) +  # actual prices
+  geom_line(aes(y = pred, color = modeltype)) + # the predictions
+  scale_color_brewer(palette = "Dark2") +
+  ggtitle("Predictor transformation : Comparing models")
+
+
+# Comparing RMSE of the three models :
+train %>% 
+  mutate(linear = predict(model_lin),   # predictions from linear model
+         squared = predict(model_sqr),  # predictions from quadratic model
+         cubic = predict(model_cub)) %>%    # predictions from cubic model
+  gather(key = modeltype, value = pred, linear, squared, cubic) %>%
+  group_by(modeltype) %>%
+  summarize(rmse = RMSE(log(SalePrice), log(pred)))
+
+
+# Training a GAM
+model_gam <- gam(log(SalePrice) ~ Neighborhood + OverallQual + OverallCond + 
+                   GrLivArea + GarageCars + s(GarageArea) + ExterQual + s(TotalBsmtSF) +
+                   KitchenQual + FullBath + s(X1stFlrSF) + MSSubClass + MSZoning + 
+                   TotRmsAbvGrd + RoofStyle + SaleType + SaleCondition + Condition1, 
+                 family = gaussian, # Important !
+                 train_set)
+
+# Predictions of GAM :
+pred_gam <- predict(model_gam, test_set)
+
+# RMSE for GAM :
+(rmse_gam <- RMSE(log(test_set$SalePrice), pred_gam))
+
+# GAM predictions VS actual values plot :
+test_set %>% cbind(pred_gam) %>% 
+  ggplot(aes(pred_gam, log(SalePrice))) +
+  geom_point() +
+  geom_abline(color = "blue") +
+  ggtitle("GAM predictions vs actual values")
+
+
+
+### Fifth model : XGBoost ####
+
+# Dummifying categorical variables of the train set
+library(vtreat)
+
+# Creating the treatment plan
+treatplan <- designTreatmentsZ(train_set[,-1], vars)
+
+# We only want the rows with codes "clean" or "lev"
+newvars <- scoreFrame %>%
+  filter(code %in% c("clean", "lev")) %>%
+  magrittr::use_series(varName)
+
+# Creating the treated training data
+dframe.treat <- prepare(treatplan, train_set[,-1], varRestriction = newvars)
+
+# Finally, we add the new binary variables with the numerical variables
+train_treat <- train_set[, -1] %>% select_if(is.numeric) %>% cbind(dframe.treat)
+
+# Preparing categorical variables of the test set and converting them into binary variables
+df_test_treat <- prepare(treatplan, test_set, varRestriction = newvars)
+
+test_treat <- test_set[, -1] %>% select_if(is.numeric) %>% cbind(df_test_treat)
+
+
+# Tuning hyperparmaters for XGBoost model :
+xgb_grid <- expand.grid(nrounds = c(200, 500, 800, 1000),
+                        max_depth = c(2,3,4,5,6,7,8), # default = 6
+                        eta = c(0.05,0.1,0.2,0.3,0.4),# default = 0.3
+                        gamma = 1,
+                        colsample_bytree = 1, # default = 1
+                        min_child_weight = 1, # default = 1
+                        subsample = 1) # default = 1
+
+
+set.seed(69, sample.kind = "Rounding") # We must set the seed to get the same results
+
+# Be careful ! Running time for this code is around 40 minutes !
+xgb_tune <-train(log(SalePrice) ~ .,
+                 data = train_treat,
+                 method = "xgbTree",
+                 trControl = cv_plan, # 10-fold cross-validation plan
+                 tuneGrid = xgb_grid, # hyperparameters we want to tune
+                 verbose = FALSE,
+                 metric = "RMSE",
+                 nthread =3)
+
+# Plot of the XGBoost tuning
+plot(xgb_tune)
+
+# XGBoost best tune
+xgb_tune$bestTune
+
+# Training an XGBoost model
+model_xgb <- xgboost(data = as.matrix(train_treat), # training data as matrix
+                     label = log(train_treat$SalePrice),  # column of outcomes
+                     nrounds = 800,       # number of trees to build
+                     objective = "reg:squarederror", # for regression
+                     eta = 0.1,
+                     max_depth = 4,
+                     verbose = 0)  # silent
+
+# Predictions of the XGBoost model
+pred_xgb <- predict(model_xgb, as.matrix(test_treat))
+
+(rmse_xgb <- RMSE(log(test_treat$SalePrice), pred_xgb))
+
+# XGBoost predictions versus actual values
+test_treat %>% cbind(pred_xgb) %>% ggplot(aes(pred_xgb, log(SalePrice))) +
+  geom_point() +
+  geom_abline(color = "blue") +
+  ggtitle("XGBoost predictions vs actual values")
+
+
+### Training models with 11 principal components ####
+
+# Linear model
+lm_11 <- lm(log(SalePrice) ~., train_11)
+
+pred_lm_11 <- predict(lm_11, test_11)
+
+(rmse_lm_11 <- RMSE(log(test_set_cp$SalePrice), pred_lm_11))
+
+# GLMnet model
+model_glmnet_11 <- train(log(SalePrice) ~ ., 
+                         train_11,
+                         tuneGrid = expand.grid(alpha = 0:1,
+                                                lambda = seq(0.0001, 1, length = 20)),
+                         method = "glmnet",
+                         trControl = cv_plan)
+
+pred_glmnet_11 <- predict(model_glmnet_11, test_11)
+
+(rmse_glmnet_11 <- RMSE(log(test_11$SalePrice), pred_glmnet_11))
+
+# RandomForest model
+rf_11 <- randomForest(log(SalePrice) ~ .,
+                      train_11)
+
+pred_rf_11 <- predict(rf_11, test_11)
+
+(rmse_rf_11 <- RMSE(log(test_11$SalePrice), pred_rf_11))
+
+# GAM
+model_gam_11 <- train(log(SalePrice) ~ ., 
+                      method = "gam", 
+                      trControl = cv_plan,
+                      train_11)
+
+pred_gam_11 <- predict(model_gam_11, test_11)
+
+(rmse_gam_11 <- RMSE(log(test_11$SalePrice), pred_gam_11))
+
+# XGBoost
+model_xgb_11 <- xgboost(data = as.matrix(train_11), 
+                        label = log(train_11$SalePrice),
+                        nrounds = 800, 
+                        objective = "reg:squarederror",
+                        eta = 0.03,
+                        max_depth = 18,
+                        verbose = 0)
+
+pred_xgb_11 <- predict(model_xgb_11, as.matrix(test_11))
+
+(rmse_xgb_11 <- RMSE(log(test_11$SalePrice), pred_xgb_11))
+
+
+### Training models with 17 principal components ####
+
+# Linear model
+lm_17 <- lm(log(SalePrice) ~., train_17)
+
+pred_lm_17 <- predict(lm_17, test_17)
+
+(rmse_lm_17 <- RMSE(log(test_set_cp$SalePrice), pred_lm_17))
+
+
+# GLMnet model
+model_glmnet_17 <- train(log(SalePrice) ~ ., 
+                         train_17,
+                         tuneGrid = expand.grid(alpha = 0:1,
+                                                lambda = seq(0.0001, 1, length = 20)),
+                         method = "glmnet",
+                         trControl = cv_plan)
+
+pred_glmnet_17 <- predict(model_glmnet_17, test_17)
+
+(rmse_glmnet_17 <- RMSE(log(test_17$SalePrice), pred_glmnet_17))
+
+
+# RandomForest model
+rf_17 <- randomForest(log(SalePrice) ~ .,
+                      train_17)
+
+pred_rf_17 <- predict(rf_17, test_17)
+
+(rmse_rf_17 <- RMSE(log(test_17$SalePrice), pred_rf_17))
+
+# GAM
+model_gam_17 <- train(log(SalePrice) ~ ., 
+                      method = "gam", 
+                      trControl = cv_plan,
+                      train_17)
+
+pred_gam_17 <- predict(model_gam_17, test_17)
+
+(rmse_gam_17 <- RMSE(log(test_17$SalePrice), pred_gam_17))
+
+# XGBoost
+model_xgb_17 <- xgboost(data = as.matrix(train_17), 
+                        label = log(train_17$SalePrice), 
+                        nrounds = 800, 
+                        objective = "reg:squarederror", 
+                        eta = 0.03,
+                        max_depth = 18,
+                        verbose = 0)
+
+pred_xgb_17 <- predict(model_xgb_17, as.matrix(test_17))
+
+(rmse_xgb_17 <- RMSE(log(test_17$SalePrice), pred_xgb_17))
+
+
+### Sum up of results of the different train sets (original variables, 11 PCs, and 17 PCs) ####
+
+data.frame(Model_type = c("Linear", "GLMnet", "randomForest", "GAM", "XGBoost"),
+           RMSE_original_train = c(rmse_lm, rmse_glmnet, rmse_rf, rmse_gam, rmse_xgb),
+           RMSE_11_components_train = c(rmse_lm_11, rmse_glmnet_11, rmse_rf_11, rmse_gam_11, rmse_xgb_11),
+           RMSE_17_components_train = c(rmse_lm_17, rmse_glmnet_17, rmse_rf_17, rmse_gam_17, rmse_xgb_17))
