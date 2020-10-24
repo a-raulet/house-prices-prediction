@@ -24,11 +24,21 @@ if(!require(glmnet)) install.packages("glmnet", repos = "http://cran.us.r-projec
 ### Data Exploration ####
 
 # Downloading the train and validation sets from GitHub to Rstudio environment
-library(readr)
-train <- read.csv("https://github.com/a-raulet/house-prices-prediction/blob/main/train.csv")
+# Train
+url_train <- "https://github.com/a-raulet/house-prices-prediction/blob/master/train.csv"
+dest_path_train <- file.path("~", "train.csv")
 
-validation <- read.csv("https://github.com/a-raulet/house-prices-prediction/blob/main/test.csv", 
-                       stringsAsFactors = FALSE)
+download.file(url_train, dest_path_train)
+
+train <- read.csv(dest_path_train, stringsAsFactors = FALSE)
+
+# Validation
+url_validation <- "https://github.com/a-raulet/house-prices-prediction/blob/master/test.csv"
+dest_path_validation <- file.path("~", "test.csv")
+
+download.file(url_validation, dest_path_validation)
+
+validation <- read.csv(dest_path_validation, stringsAsFactors = FALSE)
 
 # Structure of train set
 str(train)
@@ -153,7 +163,12 @@ train <- train %>% mutate_if(is.character, as.factor)
 # Converting "Year" variables to date variables :
 train <- train %>% mutate(YearBuilt = parse_date_time(YearBuilt, orders = "Y"),
                           YearRemodAdd = parse_date_time(YearRemodAdd, orders = "Y"),
-                          GarageYrBlt = parse_date_time(GarageYrBlt, orders = "Y"))
+                          GarageYrBlt = parse_date_time(GarageYrBlt, orders = "Y"),
+                          DateSold = make_date(year = YrSold, month = MoSold))
+
+# Adding duration variables :
+train <- train %>% mutate(durationBltSold = difftime(DateSold, YearBuilt, units = "weeks"),
+                          durationRemodSold = difftime(DateSold, YearRemodAdd, units = "weeks"))
 
 
 
@@ -363,7 +378,13 @@ validation <- validation %>% mutate_if(is.character, as.factor)
 # Converting "Year" variables to date variables :
 validation <- validation %>% mutate(YearBuilt = parse_date_time(YearBuilt, orders = "Y"),
                                     YearRemodAdd = parse_date_time(YearRemodAdd, orders = "Y"),
-                                    GarageYrBlt = parse_date_time(GarageYrBlt, orders = "Y"))
+                                    GarageYrBlt = parse_date_time(GarageYrBlt, orders = "Y"),
+                                    DateSold = make_date(year = YrSold, month = MoSold))
+
+# Adding duration variables :
+validation <- validation %>% mutate(durationBltSold = difftime(DateSold, YearBuilt, units = "weeks"),
+                                    durationRemodSold = difftime(DateSold, YearRemodAdd, units = "weeks"))
+
 
 
 
@@ -557,12 +578,11 @@ test_set <-  train[-test_index,]
 
 
 # Train and test sets with 11 components :
-train_11 <- train_pc[, 1:11] %>% cbind(train$SalePrice) %>% rename(SalePrice = `train$SalePrice` )
-test_11 <- train_pc[, 1:11] %>% cbind(train$SalePrice) %>% rename(SalePrice = `train$SalePrice` )
+train_11 <- train_pc[, 1:11] %>% cbind(train$SalePrice) %>% rename(SalePrice = `train$SalePrice`)
+test_11 <- train_pc[, 1:11] %>% cbind(train$SalePrice) %>% rename(SalePrice = `train$SalePrice`)
 
-train_11 <- train_11[test_index, ]
-test_11 <- test_11[-test_index, ]
-
+train_11 <- train_11[test_index,]
+test_11 <- test_11[-test_index,]
 # Train and test sets with 17 components :
 train_17 <- train_pc[test_index,]
 test_17 <- train_pc[-test_index,]
@@ -754,27 +774,35 @@ test_set %>% cbind(pred_gam) %>%
 
 ### Fifth model : XGBoost ####
 
-# Dummifying categorical variables of the train set
+# Dummifying categorical variables of the train set (One-hot encoding)
 library(vtreat)
 
-# Creating the treatment plan
-treatplan <- designTreatmentsZ(train_set[,-1], vars)
+# Defining categorical predictors to dummify
+vars <- names(categ_data)
 
-# We only want the rows with codes "clean" or "lev"
+# Creating the treatment plan
+treatplan <- designTreatmentsZ(train_set, vars)
+
+# Checking the scoreFrame
+scoreFrame <- treatplan %>%
+  magrittr::use_series(scoreFrame) %>%
+  dplyr::select(varName, origName, code)
+
+# We only want the rows with code "lev"
 newvars <- scoreFrame %>%
-  filter(code %in% c("clean", "lev")) %>%
+  filter(code == "lev") %>%
   magrittr::use_series(varName)
 
 # Creating the treated training data
-dframe.treat <- prepare(treatplan, train_set[,-1], varRestriction = newvars)
+df_treat <- prepare(treatplan, train_set, varRestriction = newvars)
 
-# Finally, we add the new binary variables with the numerical variables
-train_treat <- train_set[, -1] %>% select_if(is.numeric) %>% cbind(dframe.treat)
+# Finally, we add the new binary variables with the numerical variables.
+train_treat <- train_set[, -c(1, 84)] %>% select_if(is.numeric) %>% cbind(df_treat)
 
 # Preparing categorical variables of the test set and converting them into binary variables
 df_test_treat <- prepare(treatplan, test_set, varRestriction = newvars)
 
-test_treat <- test_set[, -1] %>% select_if(is.numeric) %>% cbind(df_test_treat)
+test_treat <- test_set[, -c(1, 84)] %>% select_if(is.numeric) %>% cbind(df_test_treat)
 
 
 # Tuning hyperparmaters for XGBoost model :
@@ -806,18 +834,18 @@ plot(xgb_tune)
 xgb_tune$bestTune
 
 # Training an XGBoost model
-model_xgb <- xgboost(data = as.matrix(train_treat), # training data as matrix
-                     label = log(train_treat$SalePrice),  # column of outcomes
+model_xgb <- xgboost(data = as.matrix(train_treat), # training data as matrix without the 'SalePrice' outcome
+                     label = log(train_set$SalePrice),  # we must use the original column of train_set
                      nrounds = 800,       # number of trees to build
                      objective = "reg:squarederror", # for regression
-                     eta = 0.1,
+                     eta = 0.05,
                      max_depth = 4,
                      verbose = 0)  # silent
 
 # Predictions of the XGBoost model
 pred_xgb <- predict(model_xgb, as.matrix(test_treat))
 
-(rmse_xgb <- RMSE(log(test_treat$SalePrice), pred_xgb))
+(rmse_xgb <- RMSE(log(test_set$SalePrice), pred_xgb))
 
 # XGBoost predictions versus actual values
 test_treat %>% cbind(pred_xgb) %>% ggplot(aes(pred_xgb, log(SalePrice))) +
@@ -833,7 +861,7 @@ lm_11 <- lm(log(SalePrice) ~., train_11)
 
 pred_lm_11 <- predict(lm_11, test_11)
 
-(rmse_lm_11 <- RMSE(log(test_set_cp$SalePrice), pred_lm_11))
+(rmse_lm_11 <- RMSE(log(test_11$SalePrice), pred_lm_11))
 
 # GLMnet model
 model_glmnet_11 <- train(log(SalePrice) ~ ., 
@@ -866,17 +894,17 @@ pred_gam_11 <- predict(model_gam_11, test_11)
 (rmse_gam_11 <- RMSE(log(test_11$SalePrice), pred_gam_11))
 
 # XGBoost
-model_xgb_11 <- xgboost(data = as.matrix(train_11), 
-                        label = log(train_11$SalePrice),
+model_xgb_11 <- xgboost(data = as.matrix(train_11[, -12]), 
+                        label = log(train_set$SalePrice),
                         nrounds = 800, 
                         objective = "reg:squarederror",
-                        eta = 0.03,
-                        max_depth = 18,
+                        eta = 0.05,
+                        max_depth = 5,
                         verbose = 0)
 
-pred_xgb_11 <- predict(model_xgb_11, as.matrix(test_11))
+pred_xgb_11 <- predict(model_xgb_11, as.matrix(test_11[, -12]))
 
-(rmse_xgb_11 <- RMSE(log(test_11$SalePrice), pred_xgb_11))
+(rmse_xgb_11 <- RMSE(log(test_set$SalePrice), pred_xgb_11))
 
 
 ### Training models with 17 principal components ####
@@ -886,7 +914,7 @@ lm_17 <- lm(log(SalePrice) ~., train_17)
 
 pred_lm_17 <- predict(lm_17, test_17)
 
-(rmse_lm_17 <- RMSE(log(test_set_cp$SalePrice), pred_lm_17))
+(rmse_lm_17 <- RMSE(log(test_11$SalePrice), pred_lm_17))
 
 
 # GLMnet model
@@ -921,17 +949,17 @@ pred_gam_17 <- predict(model_gam_17, test_17)
 (rmse_gam_17 <- RMSE(log(test_17$SalePrice), pred_gam_17))
 
 # XGBoost
-model_xgb_17 <- xgboost(data = as.matrix(train_17), 
-                        label = log(train_17$SalePrice), 
+model_xgb_17 <- xgboost(data = as.matrix(train_17[, -18]), 
+                        label = log(train_set$SalePrice), 
                         nrounds = 800, 
                         objective = "reg:squarederror", 
-                        eta = 0.03,
-                        max_depth = 18,
+                        eta = 0.05,
+                        max_depth = 4,
                         verbose = 0)
 
-pred_xgb_17 <- predict(model_xgb_17, as.matrix(test_17))
+pred_xgb_17 <- predict(model_xgb_17, as.matrix(test_17[, -18]))
 
-(rmse_xgb_17 <- RMSE(log(test_17$SalePrice), pred_xgb_17))
+(rmse_xgb_17 <- RMSE(log(test_set$SalePrice), pred_xgb_17))
 
 
 ### Sum up of results of the different train sets (original variables, 11 PCs, and 17 PCs) ####
@@ -940,3 +968,68 @@ data.frame(Model_type = c("Linear", "GLMnet", "randomForest", "GAM", "XGBoost"),
            RMSE_original_train = c(rmse_lm, rmse_glmnet, rmse_rf, rmse_gam, rmse_xgb),
            RMSE_11_components_train = c(rmse_lm_11, rmse_glmnet_11, rmse_rf_11, rmse_gam_11, rmse_xgb_11),
            RMSE_17_components_train = c(rmse_lm_17, rmse_glmnet_17, rmse_rf_17, rmse_gam_17, rmse_xgb_17))
+
+
+### Ensemble ####
+# Creating an ensemble of the 3 best models : GLMnet, randomForest and XGBoost
+ensemble <- (pred_glmnet + pred_rf + pred_xgb) / 3
+
+# RMSE of the ensemble
+(rmse_ensemble <- RMSE(log(test_set$SalePrice), ensemble))
+
+
+### Validation ####
+## Predictions of GLMnet
+
+pred_val_glmnet <- predict(model_glmnet, validation)
+
+## Predicting 'SalePrice' with the randomForest model 
+
+pred_val_rf <- predict(model_rf, validation)
+
+## Predictions of XGBoost model
+
+# Creating the treated validation data
+df_val_treat <- prepare(treatplan, validation, varRestriction = newvars)
+
+# Finally, we add the new binary variables with the numerical variables
+validation_treat <- validation[, -1] %>% select_if(is.numeric) %>% 
+  cbind(df_val_treat)
+
+# Predictions of the XGBoost model
+pred_val_xgb <- predict(model_xgb, as.matrix(validation_treat))
+
+
+
+## Creating the ensemble
+
+ensemble <- (pred_val_glmnet + pred_val_rf + pred_val_xgb) / 3
+
+
+# Selecting Id and predictions for submission. We must not forget to use the exponential
+# function to get the real values of sale prices.
+
+submission_ensemble <- validation %>% mutate(SalePrice = exp(ensemble)) %>% 
+  dplyr::select(Id, SalePrice)
+
+# Saving the submission
+write.csv(submission_ensemble, "Submission Ensemble.csv", row.names = FALSE)
+
+
+### Final result ####
+# Comparison of RMSEs between train and validation sets
+
+data.frame(Model_type = c("Linear", "GLMnet", "randomForest", "XGBoost", "Ensemble", "XGBoost 11 PC"),
+           RMSE_original_train = c(rmse_lm, rmse_glmnet, rmse_rf, rmse_xgb, rmse_ensemble, rmse_xgb_11),
+           RMSE_validation = c(0.15088, 0.14341, 0.14376, 0.13568, 0.13224, 0.76273))
+
+
+comparison_rmse <- data.frame(Model_type = c("Linear", "GLMnet", "randomForest", "XGBoost", "Ensemble", "XGBoost 11 PC", "Linear", "GLMnet", "randomForest", "XGBoost", "Ensemble", "XGBoost 11 PC"),
+                              RMSE = c(rmse_lm, rmse_glmnet, rmse_rf, rmse_xgb, rmse_ensemble, rmse_xgb_11, 0.15088, 0.14341, 0.14376, 0.13568, 0.13224, 0.76273),
+                              dataset = c("train", "train", "train", "train", "train", "train", "validation", "validation", "validation", "validation", "validation", "validation"))
+
+
+# Bar plot of RMSEs between train and validation sets
+comparison_rmse %>% ggplot(aes(Model_type, RMSE, fill = dataset)) +
+  geom_col(position = "dodge") +
+  ggtitle("Comparing RMSE between train and validation sets")
