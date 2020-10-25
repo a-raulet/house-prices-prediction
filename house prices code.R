@@ -18,27 +18,32 @@ if(!require(xgboost)) install.packages("xgboost", repos = "http://cran.us.r-proj
 if(!require(vtreat)) install.packages("vtreat", repos = "http://cran.us.r-project.org")
 if(!require(cowplot)) install.packages("cowplot", repos = "http://cran.us.r-project.org")
 if(!require(glmnet)) install.packages("glmnet", repos = "http://cran.us.r-project.org")
+if(!require(rstatix)) install.packages("rstatix", repos = "http://cran.us.r-project.org")
 
+
+### Downloading repository and files ####
+
+# Downloading the GitHub repository with the train and validation sets from GitHub to Rstudio environment
+
+setwd("~")
+
+url_zip_gitrepo <- "https://github.com/a-raulet/house-prices-prediction/archive/master.zip"
+
+download.file(url_zip_gitrepo, "house.zip")
+
+unzip("house.zip", exdir = "~")
+
+# Train
+
+setwd("~/house-prices-prediction-master")
+train <- read.csv("train.csv", stringsAsFactors = FALSE)
+
+# Validation
+
+validation <- read.csv("test.csv", stringsAsFactors = FALSE)
 
 
 ### Data Exploration ####
-
-# Downloading the train and validation sets from GitHub to Rstudio environment
-# Train
-url_train <- "https://github.com/a-raulet/house-prices-prediction/blob/master/train.csv"
-dest_path_train <- file.path("~", "train.csv")
-
-download.file(url_train, dest_path_train)
-
-train <- read.csv(dest_path_train, stringsAsFactors = FALSE)
-
-# Validation
-url_validation <- "https://github.com/a-raulet/house-prices-prediction/blob/master/test.csv"
-dest_path_validation <- file.path("~", "test.csv")
-
-download.file(url_validation, dest_path_validation)
-
-validation <- read.csv(dest_path_validation, stringsAsFactors = FALSE)
 
 # Structure of train set
 str(train)

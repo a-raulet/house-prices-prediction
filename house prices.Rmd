@@ -30,37 +30,41 @@ if(!require(xgboost)) install.packages("xgboost", repos = "http://cran.us.r-proj
 if(!require(vtreat)) install.packages("vtreat", repos = "http://cran.us.r-project.org")
 if(!require(cowplot)) install.packages("cowplot", repos = "http://cran.us.r-project.org")
 if(!require(glmnet)) install.packages("glmnet", repos = "http://cran.us.r-project.org")
+if(!require(rstatix)) install.packages("rstatix", repos = "http://cran.us.r-project.org")
 ```
+
 
 
 ## Introduction
 
 
-For this last project, I've chosen the House Prices dataset from [link](kaggle.com)(link : [link](https://www.kaggle.com/c/house-prices-advanced-regression-techniques/data)), which requires advanced regression techniques. Our goal is to use at least two models or algorithms that will be the most appropriated for this dataset, in order to predict house prices. As you can see on [link](kaggle.com), this dataset describes several features of houses located in Ames, Iowa, and is also part of a contest, in which the submission with the lowest Root Mean Squared Error wins. The RMSE must be calculated between the logarithm of the predicted value and the logarithm of the observed sales price. As of today (September 10th 2020), the best RMSE submitted is 0.00044, while the one of the 50th place is equal to 0.07483. The best RMSE is really low, but I accept the challenge and we'll try to get a lower RMSE.
+For this last project, I've chosen the House Prices dataset from [link](kaggle.com)(link : [link](https://www.kaggle.com/c/house-prices-advanced-regression-techniques/data)), which requires advanced regression techniques. Our goal is to use at least two models or algorithms that will be the most appropriated for this dataset, in order to predict house prices. As you can see on [link](kaggle.com), this dataset describes several features of houses located in Ames, Iowa, and is also part of a contest, in which the submission with the lowest Root Mean Squared Error wins. The RMSE must be calculated between the logarithm of the predicted value and the logarithm of the observed sale price. As of today (September 10th 2020), the best RMSE submitted is 0.00044, while the one of the 50th place is equal to 0.07483. The best RMSE is really low, but I accept the challenge and we'll try to get a lower RMSE.
 
-Before diving into the data, we will first download the files from my GitHub repository and saving them as objects in the RStudio environment. There are two files : `train` and `test`. For clarity of purpose, we will rename the test file as `validation`, because we will use it at the end as "new" data to get the predictions with our model, and we will create another train set and a test set with the original `train` set.
+Before diving into the data, we will first download my GitHub repository containing the files and datasets, and save them as objects in the RStudio environment. There are two files : `train` and `test`. For clarity of purpose, we will rename the test file as `validation`, because we will use it at the end as "new" data to get the predictions with our model, and we will create another train set and a test set with the original `train` set.
 
 
 ```{r}
-# Downloading the train and validation sets from GitHub to Rstudio environment
+# Downloading the GitHub repository with the train and validation sets from GitHub to Rstudio environment
+
+setwd("~")
+
+url_zip_gitrepo <- "https://github.com/a-raulet/house-prices-prediction/archive/master.zip"
+
+download.file(url_zip_gitrepo, "house.zip")
+
+unzip("house.zip", exdir = "~")
+
 # Train
-url_train <- "https://github.com/a-raulet/house-prices-prediction/blob/master/train.csv"
-dest_path_train <- file.path("~", "train.csv")
 
-download.file(url_train, dest_path_train)
-
-train <- read.csv(dest_path_train, stringsAsFactors = FALSE)
+setwd("~/house-prices-prediction-master")
+train <- read.csv("train.csv", stringsAsFactors = FALSE)
 
 # Validation
-url_validation <- "https://github.com/a-raulet/house-prices-prediction/blob/master/test.csv"
-dest_path_validation <- file.path("~", "test.csv")
 
-download.file(url_validation, dest_path_validation)
-
-validation <- read.csv(dest_path_validation, stringsAsFactors = FALSE)
+validation <- read.csv("test.csv", stringsAsFactors = FALSE)
 ```
 
-There is a third file on the website called `data_description`, which gives details on every variable, and can also be found here : [link](https://github.com/a-raulet/house-prices-prediction/blob/master/data_description.txt).
+There is a third file on the website called `data_description`, which gives details on every variable, and can also be found in the GitHub repository we have just downloaded or here : [link](https://github.com/a-raulet/house-prices-prediction/blob/master/data_description.txt).
 
 All files for this project (including .R, .Rmd and .pdf files) can be found at my GitHub repository here :
 
@@ -140,12 +144,30 @@ It looks like we must clean and impute missing data before proceeding our analys
 
 ### Cleaning Data and Missing Data Imputation
 
-We will first impute impute missing data for the 19 variables shown above. We see that there are mainly ordinal variables that describe quality from "Poor" to "Excellent" Quality, and NA means "None". For these variables, we will impute "None" instead of "NA". There are 15 variables in which we will impute "None" with the following code using `PoolQC` as an example. All fifteen variables are : PoolQC, Fence, BsmtQual, BsmtCond, BsmtExposure, BsmtFinType1, BsmtFinType2, FireplaceQu, GarageFinish, GarageQual, GarageCond, Alley, MiscFeature, GarageType, and MasVnrType. (Nota Bene : Full code on the .R file)
+We will first impute impute missing data for the 19 variables shown above. We see that there are mainly ordinal variables that describe quality from "Poor" to "Excellent" Quality, and NA means "None". For these variables, we will impute "None" instead of "NA". There are 15 variables in which we will impute "None" with the following code. All fifteen variables are : PoolQC, Fence, BsmtQual, BsmtCond, BsmtExposure, BsmtFinType1, BsmtFinType2, FireplaceQu, GarageFinish, GarageQual, GarageCond, Alley, MiscFeature, GarageType, and MasVnrType.
 
 ```{r}
-# Imputing "None" for 15 variables. Example below with the 'PoolQC' variable :
+# According to data description most NAs mean actually "None"
+# Imputing "None" for 15 variables.
 
+# For ordinal variables :
 train$PoolQC[is.na(train$PoolQC)] <- "None"
+train$Fence[is.na(train$Fence)] <- "None"
+train$BsmtQual[is.na(train$BsmtQual)] <- "None"
+train$BsmtCond[is.na(train$BsmtCond)] <- "None"
+train$BsmtExposure[is.na(train$BsmtExposure)] <- "None"
+train$BsmtFinType1[is.na(train$BsmtFinType2)] <- "None"
+train$BsmtFinType2[is.na(train$BsmtFinType2)] <- "None"
+train$FireplaceQu[is.na(train$FireplaceQu)] <- "None"
+train$GarageFinish[is.na(train$GarageFinish)] <- "None"
+train$GarageQual[is.na(train$GarageQual)] <- "None"
+train$GarageCond[is.na(train$GarageCond)] <- "None"
+
+# For categorical variables :
+train$MiscFeature[is.na(train$MiscFeature)] <- "None"
+train$Alley[is.na(train$Alley)] <- "None"
+train$GarageType[is.na(train$GarageType)] <- "None"
+train$MasVnrType[is.na(train$MasVnrType)] <- "None"
 
 ```
 
@@ -303,7 +325,7 @@ train <- train %>% mutate(durationBltSold = difftime(DateSold, YearBuilt, units 
                           
 ```
 
-We clean the validation set the same way we did for the train set. Most of the NAs are the same in both sets. So we won't get in the details as we can find the full code below (or the following link : [link](enter address)).
+We clean the validation set the same way we did for the train set. Most of the NAs are the same in both sets. So we won't get in the details as we can find the full code below or in the .R file from the GitHub repository we have downloaded (or the following link containing the .R code for this project : [link](https://github.com/a-raulet/house-prices-prediction/blob/master/house%20prices%20code.R)).
 
 ```{r}
 ### Cleaning validation set ####
@@ -534,7 +556,7 @@ b <- validation %>% summarise_if(is.factor, nlevels)
 a == b
 
 # To be sure we have the same number of levels in both sets, we bind the sets by row and reordering the levels.
-temp_df <- rbind(train[,-c(81:84)], validation[,-81])
+temp_df <- rbind(train[,-81], validation)
 
 temp_df <- temp_df %>% mutate_if(is.factor, as.factor)
 
@@ -680,7 +702,7 @@ length(categ_data)
 list_factors <-lapply(1:ncol(categ_data),
               function(col) ggplot2::qplot(reorder(categ_data[[col]], train$SalePrice), train$SalePrice,
                                            geom = "boxplot",
-                                           xlab = names(categ_data_sp)[[col]]))
+                                           xlab = names(categ_data)[[col]]))
 
 cowplot::plot_grid(plotlist = list_factors)
 ```
