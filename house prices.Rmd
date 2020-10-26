@@ -341,16 +341,16 @@ We clean the validation set the same way we did for the train set. Most of the N
 
 
 So, to sum up what we have just done with the train set and what we will do with the validation set is as follows :
-    + Imputing "None" for variables instead of NAs when the documentation explicitly indicates that NA means "none".
-    + Imputing "0" if it's a consequence of imputing "None" (for an area variable for example).
-    + Converting ordinal character variables into ordinal numerical variables.
-    + Converting those numerical ordinal variables into factors, adding "0" for "None".
-    + Converting numerical "Year" variables into date variables.
-    + When there are several other NAs, imputing missing data with a PCA algorithm.
-    + When there is 1 or 2  other NAs, imputing most common value or median.
-    + Converting remaining character variables into factors.
-    + Converting one character variable into binary variable (CentralAir).
-    + Converting one numerical variable into factor (MSSubClass).
+    * Imputing "None" for variables instead of NAs when the documentation explicitly indicates that NA means "none".
+    * Imputing "0" if it's a consequence of imputing "None" (for an area variable for example).
+    * Converting ordinal character variables into ordinal numerical variables.
+    * Converting those numerical ordinal variables into factors, adding "0" for "None".
+    * Converting numerical "Year" variables into date variables.
+    * When there are several other NAs, imputing missing data with a PCA algorithm.
+    * When there is 1 or 2  other NAs, imputing most common value or median.
+    * Converting remaining character variables into factors.
+    * Converting one character variable into binary variable (CentralAir).
+    * Converting one numerical variable into factor (MSSubClass).
     
 We make also a lot of plots depending on the variables to find the best value to impute or the best way to proceed.
 
@@ -1462,10 +1462,10 @@ As we can see, the RMSE for all models between train and validation sets was alm
 One of the goal of this capstone project was to use at least two models or algorithms. We used five different models during the training part, and used three of them to build an ensemble that is well balanced whose final RMSE is close to what we found during the training part.
 
 However, I did not succeed to beat the best RMSE of the kaggle contest, which is 0.00044. My final model, which is an ensemble of three models (GLMnet, randomForest, and XGBoost), reached a Root Mean Squared Error of 0.13224 on the validation set. I think this model can be use as a base for further improvements. Here are the improvements that I'm thinking about :
-  + Improving tuning of hyperparameters : some models like GLMnet and XGBoost have a lot of parameters. We only used the main ones here, so it is possible to do better.
-  + Using cross-validation only without data partition : we split the data into train and test sets (80% vs 20% respectively), but maybe I should have used the whole dataset (the first `train` set) without splitting it to get more information as the dataset is quiet small. Training would have been done through cross-validation only, but we wouldn't have been able to test our model with a `test` set. However RMSE can still be calculated through cross-validation and can give a good indication whether a model is good or not before building the final model.
-  + Deleting outliers : During the training part, we noticed there was probably an outlier when we visualized our predictions against the actual values. Deleting it may improve the model, but I think it would not make such a big difference.
-  + The cleaning of the dataset, which was a big part before the analysis, may also have been done in a different way.
+  * Improving tuning of hyperparameters : some models like GLMnet and XGBoost have a lot of parameters. We only used the main ones here, so it is possible to do better.
+  * Using cross-validation only without data partition : we split the data into train and test sets (80% vs 20% respectively), but maybe I should have used the whole dataset (the first `train` set) without splitting it to get more information as the dataset is quiet small. Training would have been done through cross-validation only, but we wouldn't have been able to test our model with a `test` set. However RMSE can still be calculated through cross-validation and can give a good indication whether a model is good or not before building the final model.
+  * Deleting outliers : During the training part, we noticed there was probably an outlier when we visualized our predictions against the actual values. Deleting it may improve the model, but I think it would not make such a big difference.
+  * The cleaning of the dataset, which was a big part before the analysis, may also have been done in a different way.
   
 Despite it was "just" a regression problem, this dataset was a great challenge and going deeper in the models to get the most out of them was fascinating. I would greatly appreciate comments, advices or feedback on how you would improve this model, or what kind of models you would have used.
 
