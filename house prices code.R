@@ -18,7 +18,7 @@ if(!require(xgboost)) install.packages("xgboost", repos = "http://cran.us.r-proj
 if(!require(vtreat)) install.packages("vtreat", repos = "http://cran.us.r-project.org")
 if(!require(cowplot)) install.packages("cowplot", repos = "http://cran.us.r-project.org")
 if(!require(glmnet)) install.packages("glmnet", repos = "http://cran.us.r-project.org")
-if(!require(rstatix)) install.packages("rstatix", repos = "http://cran.us.r-project.org")
+if(!require(magrittr)) install.packages("magrittr", repos = "http://cran.us.r-project.org")
 
 
 ### Downloading repository and files ####
@@ -473,7 +473,7 @@ train %>% mutate(Remodel_diff = YearRemodAdd - YearBuilt,
 num_data <- select_if(train, is.numeric)
 length(num_data)
 
-# Creating a grid plot with all categorical variables against the 'SalePrice' :
+# Creating a grid plot with all numerical variables against the 'SalePrice' :
 grid_num <- lapply(2:ncol(num_data[, -54]),
                    function(col) ggplot2::qplot(x = num_data[[col]],
                                                 y = train$SalePrice,
@@ -518,13 +518,15 @@ length(train_num)
 train_num_correl <- cor(train_num[, -1])# The 'Id' variable (the 1st column) will not be useful
 
 # Creating a matrix of p-value to get rid of insignificant values on the correlation matrix
+library(ggcorrplot)
 p_mat <- cor_pmat(train_num[, -1])
 
 # Plot of the correlations
-library(ggcorrplot)
-ggcorrplot(train_num_correl, hc.order = TRUE, 
+ggcorrplot(as.matrix(train_num_correl), 
+           hc.order = TRUE, 
            type = "lower", 
-           lab = TRUE, lab_size = 1.5, 
+           lab = TRUE, 
+           lab_size = 1.5, 
            p.mat = p_mat, 
            insig = "blank")
 
@@ -603,7 +605,8 @@ train %>% ggplot(aes(SalePrice)) +
   geom_density() +
   geom_vline(aes(xintercept = mean(SalePrice), color = "mean")) +
   geom_vline(aes(xintercept = median(SalePrice), color = "median")) +
-  scale_color_manual(name = "Legend", values = c(mean = "black", median = "red"))
+  scale_color_manual(name = "Legend", values = c(mean = "black", median = "red")) +
+  ggtitle("Right-skewed distribution")
 
 
 # Log transformation of 'SalePrice' for better predictions
@@ -822,9 +825,15 @@ xgb_grid <- expand.grid(nrounds = c(200, 500, 800, 1000),
 
 set.seed(69, sample.kind = "Rounding") # We must set the seed to get the same results
 
+# For tuning with the 'caret' package, we add the 'SalePrice' column to the 'train_treat' dataset.
+# Remember that 'SalePrice' outcome must not be part of the dataset when training with 'xgboost' function or it
+# will give overoptimistic results.
+
+train_treat_tune <- train_treat  %>% cbind(train_set$SalePrice) %>% rename(SalePrice = `train_set$SalePrice`)
+
 # Be careful ! Running time for this code is around 40 minutes !
 xgb_tune <-train(log(SalePrice) ~ .,
-                 data = train_treat,
+                 data = train_treat_tune,
                  method = "xgbTree",
                  trControl = cv_plan, # 10-fold cross-validation plan
                  tuneGrid = xgb_grid, # hyperparameters we want to tune
@@ -1008,13 +1017,13 @@ pred_val_xgb <- predict(model_xgb, as.matrix(validation_treat))
 
 ## Creating the ensemble
 
-ensemble <- (pred_val_glmnet + pred_val_rf + pred_val_xgb) / 3
+ensemble_val <- (pred_val_glmnet + pred_val_rf + pred_val_xgb) / 3
 
 
 # Selecting Id and predictions for submission. We must not forget to use the exponential
 # function to get the real values of sale prices.
 
-submission_ensemble <- validation %>% mutate(SalePrice = exp(ensemble)) %>% 
+submission_ensemble <- validation %>% mutate(SalePrice = exp(ensemble_val)) %>% 
   dplyr::select(Id, SalePrice)
 
 # Saving the submission

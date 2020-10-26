@@ -7,12 +7,13 @@ output: pdf_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+load("~/house-prices-prediction/capstone-houseprices.RData")
 ```
 
 
 ### Before proceeding, please install and load the packages below :
 
-```{r}
+```{r error=FALSE, warning=FALSE, message=FALSE}
 if(!require(tidyverse)) install.packages("tidyverse", repos = "http://cran.us.r-project.org")
 if(!require(caret)) install.packages("caret", repos = "http://cran.us.r-project.org")
 if(!require(data.table)) install.packages("data.table", repos = "http://cran.us.r-project.org")
@@ -30,7 +31,7 @@ if(!require(xgboost)) install.packages("xgboost", repos = "http://cran.us.r-proj
 if(!require(vtreat)) install.packages("vtreat", repos = "http://cran.us.r-project.org")
 if(!require(cowplot)) install.packages("cowplot", repos = "http://cran.us.r-project.org")
 if(!require(glmnet)) install.packages("glmnet", repos = "http://cran.us.r-project.org")
-if(!require(rstatix)) install.packages("rstatix", repos = "http://cran.us.r-project.org")
+if(!require(magrittr)) install.packages("magrittr", repos = "http://cran.us.r-project.org")
 ```
 
 
@@ -38,25 +39,36 @@ if(!require(rstatix)) install.packages("rstatix", repos = "http://cran.us.r-proj
 ## Introduction
 
 
-For this last project, I've chosen the House Prices dataset from [link](kaggle.com)(link : [link](https://www.kaggle.com/c/house-prices-advanced-regression-techniques/data)), which requires advanced regression techniques. Our goal is to use at least two models or algorithms that will be the most appropriated for this dataset, in order to predict house prices. As you can see on [link](kaggle.com), this dataset describes several features of houses located in Ames, Iowa, and is also part of a contest, in which the submission with the lowest Root Mean Squared Error wins. The RMSE must be calculated between the logarithm of the predicted value and the logarithm of the observed sale price. As of today (September 10th 2020), the best RMSE submitted is 0.00044, while the one of the 50th place is equal to 0.07483. The best RMSE is really low, but I accept the challenge and we'll try to get a lower RMSE.
+For this last project, I've chosen the House Prices dataset from [kaggle.com](kaggle.com)(link : [kaggle.com](https://www.kaggle.com/c/house-prices-advanced-regression-techniques/data)), which requires advanced regression techniques. Our goal is to use at least two models or algorithms that will be the most appropriated for this dataset, in order to predict house prices. As you can see on [kaggle.com](kaggle.com), this dataset describes several features of houses located in Ames, Iowa, and is also part of a contest, in which the submission with the lowest Root Mean Squared Error wins. The RMSE must be calculated between the logarithm of the predicted value and the logarithm of the observed sale price. As of today (September 10th 2020), the best RMSE submitted is 0.00044, while the one of the 50th place is equal to 0.07483. The best RMSE is really low, but I accept the challenge and we'll try to get a lower RMSE.
 
 Before diving into the data, we will first download my GitHub repository containing the files and datasets, and save them as objects in the RStudio environment. There are two files : `train` and `test`. For clarity of purpose, we will rename the test file as `validation`, because we will use it at the end as "new" data to get the predictions with our model, and we will create another train set and a test set with the original `train` set.
 
 
-```{r}
-# Downloading the GitHub repository with the train and validation sets from GitHub to Rstudio environment
+```{r eval=FALSE}
+# Downloading the GitHub repository with the train and validation sets from GitHub 
+# to Rstudio environment
 
-setwd("~")
+setwd("~") # To make sure we use an absolute path
 
 url_zip_gitrepo <- "https://github.com/a-raulet/house-prices-prediction/archive/master.zip"
 
 download.file(url_zip_gitrepo, "house.zip")
 
-unzip("house.zip", exdir = "~")
+unzip("house.zip", exdir = "~") # We choose again an absolute path
+```
 
-# Train
+All files will be unzipped in the following folder. We make sure R will find the data by setting the working directory with the following absolute path.
+
+```{r eval = FALSE}
+# Setting working directory
 
 setwd("~/house-prices-prediction-master")
+```
+
+
+```{r}
+# Train
+
 train <- read.csv("train.csv", stringsAsFactors = FALSE)
 
 # Validation
@@ -64,11 +76,11 @@ train <- read.csv("train.csv", stringsAsFactors = FALSE)
 validation <- read.csv("test.csv", stringsAsFactors = FALSE)
 ```
 
-There is a third file on the website called `data_description`, which gives details on every variable, and can also be found in the GitHub repository we have just downloaded or here : [link](https://github.com/a-raulet/house-prices-prediction/blob/master/data_description.txt).
+There is a third file on the website called `data_description`, which gives details on every variable, and can also be found in the GitHub repository we have just downloaded or here : [https://github.com/a-raulet/house-prices-prediction/blob/master/data_description.txt](https://github.com/a-raulet/house-prices-prediction/blob/master/data_description.txt).
 
 All files for this project (including .R, .Rmd and .pdf files) can be found at my GitHub repository here :
 
-[link](https://github.com/a-raulet/house-prices-prediction)
+[https://github.com/a-raulet/house-prices-prediction](https://github.com/a-raulet/house-prices-prediction)
 
 Here are the key steps that were performed :
 
@@ -325,9 +337,26 @@ train <- train %>% mutate(durationBltSold = difftime(DateSold, YearBuilt, units 
                           
 ```
 
-We clean the validation set the same way we did for the train set. Most of the NAs are the same in both sets. So we won't get in the details as we can find the full code below or in the .R file from the GitHub repository we have downloaded (or the following link containing the .R code for this project : [link](https://github.com/a-raulet/house-prices-prediction/blob/master/house%20prices%20code.R)).
+We clean the validation set the same way we did for the train set. Most of the NAs are the same in both sets. So we won't get in the details as we can find the full code in the .R file from the GitHub repository we have downloaded (or the following link containing the .R code for this project : [github.com](https://github.com/a-raulet/house-prices-prediction/blob/master/house%20prices%20code.R)).
 
-```{r}
+
+So, to sum up what we have just done with the train set and what we will do with the validation set is as follows :
+    + Imputing "None" for variables instead of NAs when the documentation explicitly indicates that NA means "none".
+    + Imputing "0" if it's a consequence of imputing "None" (for an area variable for example).
+    + Converting ordinal character variables into ordinal numerical variables.
+    + Converting those numerical ordinal variables into factors, adding "0" for "None".
+    + Converting numerical "Year" variables into date variables.
+    + When there are several other NAs, imputing missing data with a PCA algorithm.
+    + When there is 1 or 2  other NAs, imputing most common value or median.
+    + Converting remaining character variables into factors.
+    + Converting one character variable into binary variable (CentralAir).
+    + Converting one numerical variable into factor (MSSubClass).
+    
+We make also a lot of plots depending on the variables to find the best value to impute or the best way to proceed.
+
+We won't show the cleaning process of the validation set with the plots and results, but you can check them with .R code file.
+
+```{r include=FALSE}
 ### Cleaning validation set ####
 
 
@@ -539,12 +568,12 @@ validation <- validation %>% mutate(YearBuilt = parse_date_time(YearBuilt, order
 
 # Adding duration variables :
 validation <- validation %>% mutate(durationBltSold = difftime(DateSold, YearBuilt, units = "weeks"),
-                          durationRemodSold = difftime(DateSold, YearRemodAdd, units = "weeks"))
+                                    durationRemodSold = difftime(DateSold, YearRemodAdd, units = "weeks"))
 
 ```
 
 
-However, as we changed a lot of character variables into factors, we must be sure we have the same levels in both sets. This can be done with the following code.
+As we changed a lot of character variables into factors, we must be sure we have the same levels in both sets. This can be done with the following code.
 
 ```{r}
 # We must be sure we have the same number of levels of in both sets.
@@ -589,7 +618,7 @@ Our dataset is finally clean. We can proceed our analysis. From now, we won't to
 
 Now, let's go back to the `SalePrice` column, the outcome we want to predict, and see its distribution.
 
-```{r}
+```{r message=FALSE, warning = FALSE}
 # Distribution of Sale Prices
 
 ggplot(train, aes(SalePrice)) +
@@ -598,7 +627,7 @@ ggplot(train, aes(SalePrice)) +
 
 ```
 
-Most of the houses seem to be sold under `$`200,000. We can summarize the data in this plot with the following piece of code that confirms what we saw on the histogram, with a median at `$`163,000 and the mean under `$`181,000.
+The distribution is right-skewed and most of the houses seem to be sold under `$`200,000. We can summarize the data in this plot with the following piece of code that confirms what we saw on the histogram, with a median at `$`163,000 and the mean under `$`181,000.
 
 ```{r}
 # Summary of Sale Prices Distribution
@@ -623,7 +652,7 @@ As we can see, there are three main locations where prices are well above the me
 
 What about the area ? There are several variables describing area, but we will use the total basement area as we want the whole area of the house. We add a log scale for a better visualization and colors with the `Neighborhood` variable. As we could expected, the biggest houses seems to be located in the most attractive places.
 
-```{r}
+```{r message=FALSE, warning = FALSE}
 # Plot of Sale Prices by Total Basement Area
 
 ggplot(train, aes(TotalBsmtSF, SalePrice, color = Neighborhood)) +
@@ -657,8 +686,10 @@ As there are still a lot of variables, we must find a quicker way to get insight
 
 num_data <- select_if(train, is.numeric)
 length(num_data)
+```
 
-# Creating a grid plot with all categorical variables against the 'SalePrice' :
+```{r eval=FALSE}
+# Creating a grid plot with all numerical variables against the 'SalePrice' :
 grid_num <- lapply(2:ncol(num_data[, -54]),
                          function(col) ggplot2::qplot(x = num_data[[col]],
                                                       y = train$SalePrice,
@@ -721,21 +752,23 @@ Let's first check which variables are the most correlated with the `SalePrice` v
 ```{r}
 # Getting correlation matrix for all numerical variables
 
-train_num <- train %>% select_if(is.numeric)
+train_num <- dplyr::select_if(train, is.numeric) 
 length(train_num) # We have now 54 numerical variables
 
 train_num_correl <- cor(train_num[, -1])# The 'Id' variable (the 1st column) will not be useful
 
 # Creating a matrix of p-value to get rid of insignificant values on the correlation matrix
+library(ggcorrplot)
 
 p_mat <- cor_pmat(train_num[, -1])
 
 # Plot of the correlations
-library(ggcorrplot)
 
-ggcorrplot(train_num_correl, hc.order = TRUE, 
+ggcorrplot(as.matrix(train_num_correl), 
+           hc.order = TRUE, 
            type = "lower", 
-           lab = TRUE, lab_size = 1.5, 
+           lab = TRUE, 
+           lab_size = 1.5, 
            p.mat = p_mat, 
            insig = "blank")
 ```
@@ -893,7 +926,8 @@ train %>% ggplot(aes(SalePrice)) +
   geom_density() +
   geom_vline(aes(xintercept = mean(SalePrice), color = "mean")) +
   geom_vline(aes(xintercept = median(SalePrice), color = "median")) +
-  scale_color_manual(name = "Legend", values = c(mean = "black", median = "red"))
+  scale_color_manual(name = "Legend", values = c(mean = "black", median = "red")) +
+  ggtitle("Right-skewed distribution")
 ```
 
 If we perform a regression directly, the model could overpredict typical values. If we transform the outcome with a log function, we get a classic normal distribution : we can see that the mean and median are closer, and the dynamic of the predictions will be more reasonable, as plotted below.
@@ -1205,10 +1239,10 @@ newvars <- scoreFrame %>%
     magrittr::use_series(varName)
 
 # Creating the treated training data
-dframe.treat <- prepare(treatplan, train_set, varRestriction = newvars)
+df_treat <- prepare(treatplan, train_set, varRestriction = newvars)
 
 # Finally, we add the new binary variables with the numerical variables. We must not use the 'SalePrice' column.
-train_treat <- train_set[, -c(1, 84)] %>% select_if(is.numeric) %>% cbind(dframe.treat)
+train_treat <- train_set[, -c(1, 84)] %>% select_if(is.numeric) %>% cbind(df_treat)
 ```
 
 We do the same thing for the test set.
@@ -1222,7 +1256,7 @@ test_treat <- test_set[, -c(1, 84)] %>% select_if(is.numeric) %>% cbind(df_test_
 
 The `XGBoost` model has a lot of hyperparameters to tune. We will focus on the three main ones : the number of trees (`nrounds`), the depth of the trees (`max_depth`) and the learning rate (`eta`). To find the best tuning, we will use the `method = xgbTree` of the `caret` package. We will use the function `expand.grid()` in which we will enter the different parameters, as shown below.
 
-```{r}
+```{r eval=FALSE}
 # Tuning hyperparmaters for XGBoost model :
 
 xgb_grid <- expand.grid(nrounds = c(200, 500, 800, 1000),
@@ -1236,9 +1270,15 @@ xgb_grid <- expand.grid(nrounds = c(200, 500, 800, 1000),
 
 set.seed(69, sample.kind = "Rounding") # We must set the seed to get the same results
 
+# For tuning with the 'caret' package, we add the 'SalePrice' column to the 'train_treat' dataset.
+# Remember that 'SalePrice' outcome must not be part of the dataset when training with 'xgboost' function or it
+# will give overoptimistic results.
+
+train_treat_tune <- train_treat  %>% cbind(train_set$SalePrice) %>% rename(SalePrice = `train_set$SalePrice`)
+
 # Be careful ! Running time for this code is around 40 minutes !
 xgb_tune <-train(log(SalePrice) ~ .,
-                 data = train_treat,
+                 data = train_treat_tune,
                  method = "xgbTree",
                  trControl = cv_plan, # 10-fold cross-validation plan
                  tuneGrid = xgb_grid, # hyperparameters we wan to tune
@@ -1268,7 +1308,7 @@ Now let's train an XGBoost model with the best tuning found above.
 ```{r}
 # Training an XGBoost model
 
-model_xgb <- xgboost(data = as.matrix(train_treat), # training data as matrix without the 'SalePrice' outcome
+model_xgb <- xgboost(data = as.matrix(train_treat), # training data as matrix without 'SalePrice'
                      label = log(train_set$SalePrice),  # we must use the original column of train_set
                      nrounds = 800,       # number of trees to build
                      objective = "reg:squarederror", # for regression
@@ -1282,23 +1322,23 @@ Let's see now the result.
 ```{r}
 # Predictions of the XGBoost model
 
-pred_xgb <- predict(model_xgb, as.matrix(test_treat[, -54]))
+pred_xgb <- predict(model_xgb, as.matrix(test_treat))
 
 (rmse_xgb <- RMSE(log(test_set$SalePrice), pred_xgb))
 ```
 
-This XGBoost model gives the best result. It is 10 times better than the other models. But the RMSE is still 30 times higher than the best one of the Kaggle contest. Let's visualize our predictions.
+This XGBoost model gives the best result. But the RMSE is still higher than the best one of the Kaggle contest. Let's visualize our predictions.
 
 ```{r}
 # XGBoost predictions versus actual values
 
-test_treat %>% cbind(pred_xgb) %>% ggplot(aes(pred_xgb, log(SalePrice))) +
+test_treat %>% cbind(pred_xgb) %>% ggplot(aes(pred_xgb, log(test_set$SalePrice))) +
   geom_point() +
   geom_abline(color = "blue") +
   ggtitle("XGBoost predictions vs actual values")
 ```
 
-This is clearly the best fit. Would an ensemble of the different models improve RMSE ? Before answering this question, Let's sum up check the results of the different train sets. We will compare the results we found above and those of the train sets containing 11 and 17 principal components.
+The outlier is still there, but the difference seems less important than the other models. Would an ensemble of the different models improve RMSE ? Before answering this question, Let's sum up check the results of the different train sets. We will compare the results we found above and those of the train sets containing 11 and 17 principal components.
 
 ```{r}
 # Sum up of results of the different train sets (original variables, 11 PCs, and 17 PCs)
@@ -1315,7 +1355,7 @@ It is also important to notice that we can get almost the same results than the 
 
 ### Ensemble
 
-The XGBoost model has greatly improved our results. Despite this improvement, our model seems still far from the best result of the Kaggle contest. Would an ensemble improve the results ? I will select the best 3 models so far : GLMnet, randomForest, and XGBoost models. We can do this with the following piece of code.
+The XGBoost model has slightly improved our results. Despite this improvement, our model seems still far from the best result of the Kaggle contest. Would an ensemble improve the results ? I will select the best 3 models so far : GLMnet, randomForest, and XGBoost models. We can do this with the following piece of code.
 
 ```{r}
 # Creating an ensemble of the 3 best models : GLMnet, randomForest and XGBoost
@@ -1331,9 +1371,9 @@ So, does the ensemble improve the overall predictions ?
 (rmse_ensemble <- RMSE(log(test_set$SalePrice), ensemble))
 ```
 
-As expected, the answer is no if we were to compare with the RMSE of the XGBoost model. There is a big difference between the GLMnet and randomForest models on the one hand, and the XGBoost model on the other hand.
+The RMSE of the ensemble model is little bit better than the RMSE of the XGBoost model.
 
-So I should only use the XGBoost model for the validation set. However, my main concern is the risk of overfitting. Even though the RMSE of the XGBoost model is still more than 30 times higher than the lowest RMSE of the contest, we cannot neglect the risk of overfitting. The ensemble we've just made gives a better result than most of the models whose RMSE is between 0.13 and 0.15.
+I could only use the XGBoost model for the validation set. However, my main concern is the risk of overfitting. Even though the RMSE of the XGBoost model is close to the RMSE of the other models, we cannot neglect the risk of overfitting. The ensemble we've just made gives a slightly better result than most of the models whose RMSE is between 0.13 and 0.15.
 
 Therefore, as a final model I will choose the ensemble model as its overall result is better than most of the models (linear, GLMnet, randomForest, and GAM) and it should balance with the risk of overfitting of the XGBoost model. Kaggle allows us to send several submissions, so I will send some other models we've studied so far in order to compare with the new data, the validation set.
 
@@ -1367,7 +1407,7 @@ pred_val_xgb <- predict(model_xgb, as.matrix(validation_treat))
 
 ## Creating the ensemble
 
-ensemble <- (pred_val_glmnet + pred_val_rf + pred_val_xgb) / 3
+ensemble_val <- (pred_val_glmnet + pred_val_rf + pred_val_xgb) / 3
 ```
 
 
@@ -1377,7 +1417,7 @@ We must not forget that our predictions are a log transformation. So we must use
 # Selecting Id and predictions for submission. We must not forget to use the exponential
 # function to get the real values of sale prices.
 
-submission_ensemble <- validation %>% mutate(SalePrice = exp(ensemble)) %>% 
+submission_ensemble <- validation %>% mutate(SalePrice = exp(ensemble_val)) %>% 
   dplyr::select(Id, SalePrice)
 
 # Saving the submission
@@ -1415,7 +1455,7 @@ comparison_rmse %>% ggplot(aes(Model_type, RMSE, fill = dataset)) +
   ggtitle("Comparing RMSE between train and validation sets")
 ```
 
-As we can see, the RMSE for all models between tran and validation sets was almost the same, except for the XGBoost model containing 11 principal components. The RMSE on the validation set was 0.76273, which is six times higher than during training. This model was clearly overfit. But in general, ours models are well fit.
+As we can see, the RMSE for all models between train and validation sets was almost the same, except for the XGBoost model containing 11 principal components. The RMSE on the validation set was 0.76273, which is six times higher than during training. This model was clearly overfit. But in general, ours models are well fit.
 
 ## Conclusion
 
@@ -1427,7 +1467,8 @@ However, I did not succeed to beat the best RMSE of the kaggle contest, which is
   + Deleting outliers : During the training part, we noticed there was probably an outlier when we visualized our predictions against the actual values. Deleting it may improve the model, but I think it would not make such a big difference.
   + The cleaning of the dataset, which was a big part before the analysis, may also have been done in a different way.
   
-Despite it was "just" a regression problem, this dataset was a great challenge and going deeper in the models to get the most out of them was fascinating. I would greatly appreciate comments or feedback on how you would improve this model, or what kind of models you would have used.
+Despite it was "just" a regression problem, this dataset was a great challenge and going deeper in the models to get the most out of them was fascinating. I would greatly appreciate comments, advices or feedback on how you would improve this model, or what kind of models you would have used.
 
 
-                                                                                      Arnaud RAULET
+
+                                                                        Arnaud RAULET
