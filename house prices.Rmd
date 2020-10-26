@@ -156,7 +156,7 @@ It looks like we must clean and impute missing data before proceeding our analys
 
 ### Cleaning Data and Missing Data Imputation
 
-We will first impute impute missing data for the 19 variables shown above. We see that there are mainly ordinal variables that describe quality from "Poor" to "Excellent" Quality, and NA means "None". For these variables, we will impute "None" instead of "NA". There are 15 variables in which we will impute "None" with the following code. All fifteen variables are : PoolQC, Fence, BsmtQual, BsmtCond, BsmtExposure, BsmtFinType1, BsmtFinType2, FireplaceQu, GarageFinish, GarageQual, GarageCond, Alley, MiscFeature, GarageType, and MasVnrType.
+We will first impute missing data for the 19 variables shown above. We see that there are mainly ordinal variables that describe quality from "Poor" to "Excellent" Quality, and NA means "None". For these variables, we will impute "None" instead of "NA". There are 15 variables in which we will impute "None" with the following code. All fifteen variables are : PoolQC, Fence, BsmtQual, BsmtCond, BsmtExposure, BsmtFinType1, BsmtFinType2, FireplaceQu, GarageFinish, GarageQual, GarageCond, Alley, MiscFeature, GarageType, and MasVnrType.
 
 ```{r}
 # According to data description most NAs mean actually "None"
@@ -321,7 +321,7 @@ train %>% select_if(is.character) %>% length()
 train <- train %>% mutate_if(is.character, as.factor)
 ```
 
-We will finish this cleaning process with the date variables. There are 5 date variables : `YearBuilt` is the original construction date, `YearRemodAdd` is the remodel date (but is equal to `YearBuilt` if there is none), `GarageYrBlt` and `MoSold` and `YrSold`. We will use the `lubridate` package to convert those variables into "date" class variables. For `MoSold` and `YrSold`, we will create a new variable called `DateSold` as we prefer to have both month and year in the same column to calculate duration. As we have almost only years available among the variables, the `parse_date_time` function will replace day and month by "01" when converting. We will also add two more variables : `durationBltSold` that calculates the difference between the sale date and the construction date, and `durationRemodSold`, which the difference between the sale date and the remodel date as we may be interested in correlations between the sale price and newer or older house. We do all this with the following code.
+We will finish this cleaning process with the date variables. There are 5 date variables : `YearBuilt` is the original construction date, `YearRemodAdd` is the remodel date (but is equal to `YearBuilt` if there is none), `GarageYrBlt` and `MoSold` and `YrSold`. We will use the `lubridate` package to convert those variables into "date" class variables. For `MoSold` and `YrSold`, we will create a new variable called `DateSold` as we prefer to have both month and year in the same column to calculate duration. As we have almost only years available among the variables, the `parse_date_time` function will replace day and month by "01" when converting. We will also add two more variables : `durationBltSold` that calculates the difference between the sale date and the construction date, and `durationRemodSold`, which is the difference between the sale date and the remodel date as we may be interested in correlations between the sale price and newer or older house. We do all this with the following code.
 
 ```{r}
 # Converting "Year" variables to date variables and merging 'Sold Month' and 'Sold Year' :
@@ -585,7 +585,8 @@ b <- validation %>% summarise_if(is.factor, nlevels)
 
 a == b
 
-# To be sure we have the same number of levels in both sets, we bind the sets by row and reordering the levels.
+# To be sure we have the same number of levels in both sets, we bind 
+# the sets by row and reordering the levels.
 temp_df <- rbind(train[,-81], validation)
 
 temp_df <- temp_df %>% mutate_if(is.factor, as.factor)
@@ -651,7 +652,7 @@ ggplot(train, aes(reorder(Neighborhood, SalePrice), SalePrice)) +
 
 As we can see, there are three main locations where prices are well above the mean and having the most expensive houses (i.e., Northridge, Northridge Heights and Stone Brook). On the other hand, some locations are almost half the mean, that is to say around `$`100,000 or below (for example, Meadow Village or Iowa DOT and Rail Road).
 
-What about the area ? There are several variables describing area, but we will use the total basement area as we want the whole area of the house. We add a log scale for a better visualization and colors with the `Neighborhood` variable. As we could expected, the biggest houses seems to be located in the most attractive places.
+What about the area ? There are several variables describing area, but we will use the total basement area as we want the whole area of the house. We add a log scale for a better visualization and colors with the `Neighborhood` variable. As we could expect, the biggest houses seem to be located in the most attractive places.
 
 ```{r message=FALSE, warning = FALSE}
 # Plot of Sale Prices by Total Basement Area
@@ -798,7 +799,7 @@ fviz_pca_var(pca_num, select.var = list(contrib = 5), repel = TRUE)
 
 ```
 
-Here we can see the five most contributing variables to the first two components : `GrLivArea`, `OverallQual`, `TotRmsAbvGrd`, `GarageCars` and `GarageArea`. This is not a surprise, the two "garage" variables are almost on the same axis. We've already discussed the importance of `GrLivArea` and `OverallQual`.
+Here we can see the five most contributing variables to the first two components : `GrLivArea`, `OverallQual`, `TotRmsAbvGrd`, `GarageCars` and `GarageArea`. This confirms what we saw in the previous plots. It is also not a surprise to see that the two "garage" variables are almost on the same axis. We've already discussed the importance of `GrLivArea` and `OverallQual`.
 
 We can also check which variables contribute the most to each component. Here we will check contributions of 20 variables for PC1 in the first plot, and PC2 in the second one with the following code.
 
@@ -845,7 +846,7 @@ paran_output <- paran(train_num[,-c(1, 54)], seed = 69, graph = TRUE)
 paran_output$Retained
 ```
 
-According to this parallel analysis, we should retain 11 components. So how many components should we retain ? 11 or 17 ? To answer this question, we will train two more datasets : one containing the first 11 components, and another one containing 17 components. We will then compare the RMSE of each train set.
+According to this parallel analysis, we should retain 11 components (which explain 58% of the variance according to PCA). So how many components should we retain ? 11 or 17 ? To answer this question, we will train two more datasets : one containing the first 11 components, and another one containing 17 components. We will then compare the RMSE of each train set.
 
 Along this Exploratory Data Analysis, we have used different plots and have found some variables seem to be more important than others. That is to say, the `SalePrice` outcome and some of the variables follow a bivariate normal distribution which suggests they are correlated and therefore, the conditional expectation is given by the regression line. Thus, we will need linear models to train the dataset, or models that can solve regression problems.
 
@@ -972,12 +973,13 @@ The RMSE is better when we transform the outcome in our model with the `log` fun
 ### First model : Linear regression
 
 Let's first train a linear regression using `train` of the caret package. We will add the cross-validation, and also a preprocess step that will :
+
 + identify predictors with near zero variance that won't be useful ;
 + center predictors ;
 + scale predictors ;
 + and finally perform a PCA.
 
-During Exploratory Data Analysis, we saw that PCA could reduced the number of predictors between 11 and 17 components. So this preprocess will reduce the number of dimensions and get rid of collinearity. We do this with the following piece of code.
+During Exploratory Data Analysis, we saw that PCA could reduce the number of predictors between 11 and 17 components. So this preprocess will reduce the number of dimensions and get rid of collinearity. We do this with the following piece of code.
 
 ```{r}
 # Training a linear model
@@ -1016,12 +1018,13 @@ test_set %>% cbind(pred_lm) %>%
 ### Second model : GLMnet
 
 GLMnet is an extension of the linear regression, but it helps dealing with collinearity and small datasets, and penalizes number of non-zero-coefficients (also known as "lasso regression") and penalizes absolute magnitude of coefficients (also known as "ridge regression") in order to find a simpler model. There are two main parameters that we must tune for this model :
+
 + alpha : "0" for a pure ridge regression, and "1" for a pure lasso regression ;
 + lambda : this is where we tune the size of the penalty.
 
 We tune this two parameters inside the `tuneGrid` argument. We must set seed to get the same results. Tuning parameters are almost the same as the linear regression model, except that we don't run PCA this time.
 
-```{r}
+```{r message=FALSE, warning=FALSE}
 # Training a GLMnet model
 set.seed(69, sample.kind = "Rounding")
 
@@ -1094,7 +1097,7 @@ plot(model_rf)
 model_rf$bestTune
 ```
 
-According to the plot and the best tune of the model, the lowest RMSE is reached with 49 randomly selected predictors (`mtry`) using variance as splitting rule. Let's check the predictions.
+According to the plot and the best tune of the model, the lowest RMSE is reached with 50 randomly selected predictors (`mtry`) using variance as splitting rule. Let's check the predictions.
 
 ```{r}
 # Predictions of the randomForest model :
@@ -1121,7 +1124,7 @@ It seems the biggest errors are for the cheapest houses and the most expensive h
 
 ### Fourth model : Generalized Additive Model (GAM)
 
-The GAM is another extension of the linear model. The advantage of GAM is that it can deal with non-linear predictors. Sometimes, predictors that measure areas (like `GrLivArea`, `TotalBsmtSF`, or `LotArea` in the dataset) must be transformed, i.e. squared or cubic, to fit a model that wants to predict the price. In that kind of cases, observations follow a line along for low values but sharply increases as area and prices get higher. We will better understand this with the next plot. We will take the `GrLivArea` as an example and plot it against `SalePrice`. We calculate three linear models : one without transformation of `GrLivArea`, one with `GrLivArea` squared, and the last one with cubic transformation.
+The GAM is another extension of the linear model. The advantage of GAM is that it can deal with non-linear predictors. Sometimes, predictors that measure areas (like `GrLivArea`, `TotalBsmtSF`, or `LotArea` in the dataset) must be transformed, i.e. squared or cubic, to fit a model that wants to predict a price (like in this dataset). In that kind of cases, observations follow a line along low values but sharply increases as area and prices get higher. We will better understand this with the next plot. We will take the `GrLivArea` as an example and plot it against `SalePrice`. We calculate three linear models : one without transformation of `GrLivArea`, one with `GrLivArea` squared, and the last one with cubic transformation.
 
 ```{r}
 # Transformation of predictor : an example with 'GrLivArea' against 'SalePrice'
@@ -1219,7 +1222,7 @@ The problem with XGBoost is that it can easily overfit. So we must be careful wh
 But first, we need to prepare the train set. The `XGBoost` model only accept matrix with numerical values. So we must dummify the categorical variables, i.e. we must convert each level of factors into binary variables. We will use the `vtreat` package to do that.
 
 
-```{r}
+```{r message=FALSE}
 # Dummifying categorical variables of the train set (One-hot encoding)
 library(vtreat)
 
@@ -1242,7 +1245,8 @@ newvars <- scoreFrame %>%
 # Creating the treated training data
 df_treat <- prepare(treatplan, train_set, varRestriction = newvars)
 
-# Finally, we add the new binary variables with the numerical variables. We must not use the 'SalePrice' column.
+# Finally, we add the new binary variables with the numerical variables. 
+# We must not use the 'SalePrice' column.
 train_treat <- train_set[, -c(1, 84)] %>% select_if(is.numeric) %>% cbind(df_treat)
 ```
 
@@ -1272,10 +1276,12 @@ xgb_grid <- expand.grid(nrounds = c(200, 500, 800, 1000),
 set.seed(69, sample.kind = "Rounding") # We must set the seed to get the same results
 
 # For tuning with the 'caret' package, we add the 'SalePrice' column to the 'train_treat' dataset.
-# Remember that 'SalePrice' outcome must not be part of the dataset when training with 'xgboost' function or it
+# Remember that 'SalePrice' outcome must not be part of the dataset 
+# when training with 'xgboost' function or it
 # will give overoptimistic results.
 
-train_treat_tune <- train_treat  %>% cbind(train_set$SalePrice) %>% rename(SalePrice = `train_set$SalePrice`)
+train_treat_tune <- train_treat  %>% cbind(train_set$SalePrice) %>% 
+  rename(SalePrice = `train_set$SalePrice`)
 
 # Be careful ! Running time for this code is around 40 minutes !
 xgb_tune <-train(log(SalePrice) ~ .,
@@ -1339,7 +1345,7 @@ test_treat %>% cbind(pred_xgb) %>% ggplot(aes(pred_xgb, log(test_set$SalePrice))
   ggtitle("XGBoost predictions vs actual values")
 ```
 
-The outlier is still there, but the difference seems less important than the other models. Would an ensemble of the different models improve RMSE ? Before answering this question, Let's sum up check the results of the different train sets. We will compare the results we found above and those of the train sets containing 11 and 17 principal components.
+The outlier is still there, but the difference seems less important than the other models. Would an ensemble of the different models improve RMSE ? Before answering this question, Let's sum up and check the results of the different train sets. We will compare the results we found above and those of the train sets containing 11 and 17 principal components.
 
 ```{r}
 # Sum up of results of the different train sets (original variables, 11 PCs, and 17 PCs)
@@ -1350,9 +1356,9 @@ data.frame(Model_type = c("Linear", "GLMnet", "randomForest", "GAM", "XGBoost"),
            RMSE_17_components_train = c(rmse_lm_17, rmse_glmnet_17, rmse_rf_17, rmse_gam_17, rmse_xgb_17))
 ```
 
-The two train sets containing 11 and 17 principal components has almost the same results than the train set containing the original predictors, except for the XGBoost. It is important to notice that when training XGBoost models with the principal components, the `SalePrice` outcome must not be in the `data` argument like we are used to do with the `train` function of the `caret` package or other models. The reason is that it will be considered as predictor, and it will give an overoptimistic result and the model will be overfit. That's why we use the `SalePrice` column of the original `train_set` while being carful to keep the same index of rows by using the same `test_index` on every train_set.
+The two train sets containing 11 and 17 principal components has almost the same results than the train set containing the original predictors, except for the XGBoost. It is important to notice that when training XGBoost models with the principal components, the `SalePrice` outcome must not be in the `data` argument like we are used to do with the `train` function of the `caret` package or other models. The reason is that it will be considered as predictor, and it will give an overoptimistic result and the model will be overfit. That's why we use the `SalePrice` column of the original `train_set` while being carful to keep the same index of rows by using the same `test_index` on every train set.
 
-It is also important to notice that we can get almost the same results than the train set with original variables with only 11 principal components. The parallel analysis was greatly useful to reduce the number of dimensions.
+It is also important to notice that we can get almost the same results than the train set with original variables with only 11 principal components. The parallel analysis was greatly useful to confirm the number of dimensions to retain.
 
 ### Ensemble
 
@@ -1372,7 +1378,7 @@ So, does the ensemble improve the overall predictions ?
 (rmse_ensemble <- RMSE(log(test_set$SalePrice), ensemble))
 ```
 
-The RMSE of the ensemble model is little bit better than the RMSE of the XGBoost model.
+The RMSE of the ensemble model is a little bit better than the RMSE of the XGBoost model.
 
 I could only use the XGBoost model for the validation set. However, my main concern is the risk of overfitting. Even though the RMSE of the XGBoost model is close to the RMSE of the other models, we cannot neglect the risk of overfitting. The ensemble we've just made gives a slightly better result than most of the models whose RMSE is between 0.13 and 0.15.
 
@@ -1460,7 +1466,7 @@ As we can see, the RMSE for all models between train and validation sets was alm
 
 ## Conclusion
 
-One of the goal of this capstone project was to use at least two models or algorithms. We used five different models during the training part, and used three of them to build an ensemble that is well balanced whose final RMSE is close to what we found during the training part. We also found that we could greatly reduce the number of dimensions with a PCA. The parallel analysis showed us that we could retain 11 principal components, and we got almost the same results than with models containing original predictors.
+One of the goal of this capstone project was to use at least two models or algorithms. We used five different models during the training part, and used three of them to build an ensemble that is well balanced whose final RMSE is close to what we found during the training part. We also found that we could greatly reduce the number of dimensions with a PCA. The parallel analysis showed us that we could retain 11 principal components, and we got almost the same results than with models containing original predictors, except for the XGBoost model on the validation set.
 
 However, I did not succeed to beat the best RMSE of the kaggle contest, which is 0.00044. My final model, which is an ensemble of three models (GLMnet, randomForest, and XGBoost), reached a Root Mean Squared Error of 0.13224 on the validation set. I think this model can be use as a base for further improvements. Here are the improvements that I'm thinking about :
 
@@ -1473,4 +1479,7 @@ Despite it was "just" a regression problem, this dataset was a great challenge a
 
 
 
+
+
+                                                                        
                                                                         Arnaud RAULET
