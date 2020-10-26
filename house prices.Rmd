@@ -48,16 +48,16 @@ Before diving into the data, we will first download my GitHub repository contain
 # Downloading the GitHub repository with the train and validation sets from GitHub 
 # to Rstudio environment
 
-setwd("~") # To make sure we use an absolute path
+setwd("~") # To make sure we use a relative path
 
 url_zip_gitrepo <- "https://github.com/a-raulet/house-prices-prediction/archive/master.zip"
 
 download.file(url_zip_gitrepo, "house.zip")
 
-unzip("house.zip", exdir = "~") # We choose again an absolute path
+unzip("house.zip", exdir = "~") # We choose again a relative path
 ```
 
-All files will be unzipped in the following folder. We make sure R will find the data by setting the working directory with the following absolute path.
+All files will be unzipped in the following folder. We make sure R will find the data by setting the working directory with the following relative path.
 
 ```{r eval = FALSE}
 # Setting working directory
@@ -341,16 +341,17 @@ We clean the validation set the same way we did for the train set. Most of the N
 
 
 So, to sum up what we have just done with the train set and what we will do with the validation set is as follows :
-    * Imputing "None" for variables instead of NAs when the documentation explicitly indicates that NA means "none".
-    * Imputing "0" if it's a consequence of imputing "None" (for an area variable for example).
-    * Converting ordinal character variables into ordinal numerical variables.
-    * Converting those numerical ordinal variables into factors, adding "0" for "None".
-    * Converting numerical "Year" variables into date variables.
-    * When there are several other NAs, imputing missing data with a PCA algorithm.
-    * When there is 1 or 2  other NAs, imputing most common value or median.
-    * Converting remaining character variables into factors.
-    * Converting one character variable into binary variable (CentralAir).
-    * Converting one numerical variable into factor (MSSubClass).
+
+* Imputing "None" for variables instead of NAs when the documentation explicitly indicates that NA means "none".
+* Imputing "0" if it's a consequence of imputing "None" (for an area variable for example).
+* Converting ordinal character variables into ordinal numerical variables.
+* Converting those numerical ordinal variables into factors, adding "0" for "None".
+* Converting numerical "Year" variables into date variables.
+* When there are several other NAs, imputing missing data with a PCA algorithm.
+* When there is 1 or 2  other NAs, imputing most common value or median.
+* Converting remaining character variables into factors.
+* Converting one character variable into binary variable (CentralAir).
+* Converting one numerical variable into factor (MSSubClass).
     
 We make also a lot of plots depending on the variables to find the best value to impute or the best way to proceed.
 
@@ -1169,7 +1170,7 @@ Unexpectedly, the linear model still gives the best RMSE here, but the quadratic
 
 This kind of predictors are called additive predictors, and can be specified in a generalized additive model with the `s()` function to specify that we want to use a "spline" to model the non-linear relationship between the outcome and the predictor. This is used for continuous variables as we've seen above.
 
-I will still train a GAM, but this time I'll use the original package `gam`, instead of the `method = "gam"` of the `train` function in the `caret` package, because I got better results when I trained different models of GAM. I will also use the most relevant predictors we found during Exploratory Data Analysis, and I will add a spline (`s()` function) to continuous variables, except `GrLivArea`, as we've just seen that a linear relationship gives a better RMSE. It is advised to use the spline with a continuous variable containing at least 10 continuous values. We could have used the spline for the `OverallQual` and `OverallCond` as there are 10 levels, but unique values are below 10, so we won't use it.
+I will still train a GAM, but this time I'll use the original package `gam`, instead of the `method = "gam"` of the `train` function in the `caret` package, because I got better results when I trained different models of GAM. I will also use the most relevant predictors we found during Exploratory Data Analysis (it returns an error with all predictors), and I will add a spline (`s()` function) to continuous variables, except `GrLivArea`, as we've just seen that a linear relationship gives a better RMSE. It is advised to use the spline with a continuous variable containing at least 10 continuous values. We could have used the spline for the `OverallQual` and `OverallCond` as there are 10 levels, but unique values are below 10, so we won't use it.
 
 ```{r}
 # Training a GAM
@@ -1207,7 +1208,7 @@ test_set %>% cbind(pred_gam) %>%
   ggtitle("GAM predictions vs actual values")
 ```
 
-According to the visualization, the model seems somehow well fit, but there is still too much dispersion and the same outlier. When we look at the RMSE, it seems it will be difficult to reach the best RMSE of the Kaggle contest. But I don't give up and I will train a fifth model : XGBoost.
+According to the visualization, the model seems somehow well fit, but there is still too much dispersion and the same outlier. We can notice that we get almost the same results than the other models with just a few well-selected predictors, those we found during Exploratory Data Analysis. When we look at the RMSE, it seems it will be difficult to reach the best RMSE of the Kaggle contest. But I don't give up and I will train a fifth model : XGBoost.
 
 ### Fifth model : XGBoost
 
@@ -1459,13 +1460,14 @@ As we can see, the RMSE for all models between train and validation sets was alm
 
 ## Conclusion
 
-One of the goal of this capstone project was to use at least two models or algorithms. We used five different models during the training part, and used three of them to build an ensemble that is well balanced whose final RMSE is close to what we found during the training part.
+One of the goal of this capstone project was to use at least two models or algorithms. We used five different models during the training part, and used three of them to build an ensemble that is well balanced whose final RMSE is close to what we found during the training part. We also found that we could greatly reduce the number of dimensions with a PCA. The parallel analysis showed us that we could retain 11 principal components, and we got almost the same results than with models containing original predictors.
 
 However, I did not succeed to beat the best RMSE of the kaggle contest, which is 0.00044. My final model, which is an ensemble of three models (GLMnet, randomForest, and XGBoost), reached a Root Mean Squared Error of 0.13224 on the validation set. I think this model can be use as a base for further improvements. Here are the improvements that I'm thinking about :
-  * Improving tuning of hyperparameters : some models like GLMnet and XGBoost have a lot of parameters. We only used the main ones here, so it is possible to do better.
-  * Using cross-validation only without data partition : we split the data into train and test sets (80% vs 20% respectively), but maybe I should have used the whole dataset (the first `train` set) without splitting it to get more information as the dataset is quiet small. Training would have been done through cross-validation only, but we wouldn't have been able to test our model with a `test` set. However RMSE can still be calculated through cross-validation and can give a good indication whether a model is good or not before building the final model.
-  * Deleting outliers : During the training part, we noticed there was probably an outlier when we visualized our predictions against the actual values. Deleting it may improve the model, but I think it would not make such a big difference.
-  * The cleaning of the dataset, which was a big part before the analysis, may also have been done in a different way.
+
+* Improving tuning of hyperparameters : some models like GLMnet and XGBoost have a lot of parameters. We only used the main ones here, so it is possible to do better.
+* Using cross-validation only without data partition : we split the data into train and test sets (80% vs 20% respectively), but maybe I should have used the whole dataset (the first `train` set) without splitting it to get more information as the dataset is quiet small. Training would have been done through cross-validation only, but we wouldn't have been able to test our model with a `test` set. However RMSE can still be calculated through cross-validation and can give a good indication whether a model is good or not before building the final model.
+* Deleting outliers : During the training part, we noticed there was probably an outlier when we visualized our predictions against the actual values. Deleting it may improve the model, but I think it would not make such a big difference.
+* The cleaning of the dataset, which was a big part before the analysis, may also have been done in a different way.
   
 Despite it was "just" a regression problem, this dataset was a great challenge and going deeper in the models to get the most out of them was fascinating. I would greatly appreciate comments, advices or feedback on how you would improve this model, or what kind of models you would have used.
 
