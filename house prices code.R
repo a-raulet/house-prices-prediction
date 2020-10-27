@@ -288,10 +288,14 @@ validation %>%
   ggplot(aes(factor(GarageCond), GarageQual, col = factor(GarageCars))) +
   geom_jitter()
 
+# 1 seems to be the best value according to the plot
 validation$GarageCars[is.na(validation$GarageCars)] <- 1
 
 # Where is the NA for GarageArea ?
 which(is.na(validation$GarageArea))
+
+# The Garage Type is "Detchd"
+validation$GarageType[1117]
 
 validation %>% filter(GarageArea > 0) %>% group_by(GarageType) %>% 
   summarize(min = min(GarageArea), median = median(GarageArea))
@@ -300,6 +304,7 @@ validation %>%
   ggplot(aes(GarageType, GarageArea)) +
   geom_boxplot()
 
+# We impute the median area for "Detchd" garage type
 validation$GarageArea[is.na(validation$GarageArea)] <- 384
 
 
@@ -309,6 +314,7 @@ which(is.na(validation$Functional))
 validation %>% ggplot(aes(Functional)) +
   geom_bar()
 
+# "Typ" seems to be the less risky value according to the plot
 validation$Functional[is.na(validation$Functional)] <- "Typ"
 
 # NAs of Utilities :
@@ -317,11 +323,13 @@ which(is.na(validation$Utilities))
 validation %>% ggplot(aes(Utilities)) +
   geom_bar()
 
+# Every obsersation is either "AllPub" or "NA". We therefore impute "AllPub".
 validation$Utilities[is.na(validation$Utilities)] <- "AllPub"
 
 
 ### Basement variables
-# NAs of "Basement" variables (2 rows). No basement, so all areas equal to 0. So is the number of baths.
+# NAs of "Basement" variables (2 rows). No basement, so all areas equal to 0. 
+# So is the number of baths.
 which(is.na(validation$BsmtFinSF1)) 
 which(is.na(validation$BsmtFinSF2))
 which(is.na(validation$BsmtUnfSF))
@@ -741,7 +749,7 @@ train %>% mutate(linear = predict(model_lin), # predictions from linear model
                  cubic = predict(model_cub)) %>%      # predictions from cubic model
   gather(key = modeltype, value = pred, linear, squared, cubic) %>% # gather the predictions
   ggplot(aes(x = GrLivArea)) + 
-  geom_point(aes(y = SalePrice, label = Id)) +  # actual prices
+  geom_point(aes(y = SalePrice)) +  # actual prices
   geom_line(aes(y = pred, color = modeltype)) + # the predictions
   scale_color_brewer(palette = "Dark2") +
   ggtitle("Predictor transformation : Comparing models")
@@ -862,7 +870,7 @@ pred_xgb <- predict(model_xgb, as.matrix(test_treat))
 (rmse_xgb <- RMSE(log(test_set$SalePrice), pred_xgb))
 
 # XGBoost predictions versus actual values
-test_treat %>% cbind(pred_xgb) %>% ggplot(aes(pred_xgb, log(SalePrice))) +
+test_treat %>% cbind(pred_xgb) %>% ggplot(aes(pred_xgb, log(test_set$SalePrice))) +
   geom_point() +
   geom_abline(color = "blue") +
   ggtitle("XGBoost predictions vs actual values")
